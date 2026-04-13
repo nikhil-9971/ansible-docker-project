@@ -1,0 +1,21 @@
+---
+- name: Apply common configuration
+  hosts: web1
+  become: true
+  roles:
+    - common
+  tags: common
+
+- name: Install Docker and run containers
+  hosts: web1
+  become: true
+  roles:
+    - docker
+  tags: docker
+
+- name: Configure Nginx reverse proxy
+  hosts: web1
+  become: true
+  roles:
+    - nginx
+  tags: nginx

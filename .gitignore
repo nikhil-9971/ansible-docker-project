@@ -1,0 +1,5 @@
+.vault_pass
+github
+github.pub
+keys/terra-key-ansible
+group_vars/web/vault.yml

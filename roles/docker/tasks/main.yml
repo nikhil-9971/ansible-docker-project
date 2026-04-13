@@ -1,0 +1,109 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/docker
+
+# Install required dependencies
+- name: Install Docker dependencies
+  yum:
+    name:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+    state: present
+  tags: docker
+
+# Add Docker repository
+- name: Add Docker CE repository
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+  tags: docker
+
+# Install Docker
+- name: Install Docker 
+  yum:
+    name: docker
+    state: present
+  tags: docker
+
+
+
+# Start and enable Docker
+- name: Start and enable Docker service
+  service:
+    name: docker
+    state: started
+    enabled: true
+  tags: docker
+
+# Add deploy user to docker group
+- name: Add ec2-user to docker group
+  user:
+    name: ec2-user
+    groups: docker
+    append: yes
+  tags: docker
+
+# Install pip (required for docker SDK)
+- name: Install pip
+  yum:
+    name:
+      - python3
+      - python3-pip
+    state: present
+    update_cache: yes
+  tags: docker
+
+# Install docker python module
+- name: Install docker SDK for python
+  pip:
+    name: docker
+    executable: pip3
+    extra_args: --ignore-installed
+  tags: docker
+
+# Install Docker Compose (binary)
+- name: Install Docker Compose
+  get_url: 
+    url: https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+  tags: docker
+
+# Login to Docker Hub (using Vault)
+- name: Log in to Docker Hub
+  community.docker.docker_login:
+    username: "{{ vault_docker_username }}"
+    password: "{{ vault_docker_password }}"
+  when: vault_docker_username is defined
+  tags: docker
+
+# Pull Docker image
+- name: Pull application image
+  community.docker.docker_image:
+    name: "{{ docker_app_image }}"
+    tag: "{{ docker_app_tag }}"
+    source: pull
+  tags: docker
+
+# Run container
+- name: Run application container
+  community.docker.docker_container:
+    name: "{{ docker_app_name }}"
+    image: "{{ docker_app_image }}:{{ docker_app_tag }}"
+    state: started
+    restart_policy: always
+    ports:
+      - "{{ docker_app_port }}:{{ docker_container_port }}"
+  tags: docker
+
+# Wait for container to be ready
+- name: Wait for container to be healthy
+  uri:
+    url: "http://localhost:{{ docker_app_port }}"
+    status_code: 200
+  register: result
+  retries: 5
+  delay: 3
+  until: result.status == 200
+  tags: docker
